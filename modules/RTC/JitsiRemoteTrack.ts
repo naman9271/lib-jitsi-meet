@@ -31,12 +31,12 @@ const containerEvents = [ 'abort', 'canplaythrough', 'ended', 'error', 'stalled'
  */
 export default class JitsiRemoteTrack extends JitsiTrack {
     private rtc: RTC;
-    private conference: JitsiConference;
+    public conference: JitsiConference;
     private ownerEndpointId: string;
     private stream: MediaStream;
-    private track: MediaStreamTrack;
+    public track: MediaStreamTrack;
     private mediaType: any;
-    private videoType: VideoType;
+    public videoType: VideoType;
     private ssrc: number;
     private muted: boolean;
     private isP2P: boolean;
@@ -242,9 +242,11 @@ export default class JitsiRemoteTrack extends JitsiTrack {
             this.hasBeenMuted = true;
         }
 
-        // we can have a fake video stream
+        // Correctly mute each track in the stream
         if (this.stream) {
-            this.stream.muted = value;
+            this.stream.getTracks().forEach(track => {
+                track.enabled = !value;
+            });
         }
 
         this.muted = value;
