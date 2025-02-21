@@ -1,4 +1,3 @@
-
 import JitsiTrackError from '../../JitsiTrackError';
 import * as JitsiTrackErrors from '../../JitsiTrackErrors';
 import browser from '../browser';
@@ -20,8 +19,7 @@ const ScreenObtainer = {
      * after it's done.
      * {@type Promise|null}
      */
-
-    obtainStream: null,
+    obtainStream: null as (() => Promise<MediaStream>) | null,
 
     /**
      * Initializes the function used to obtain a screen capture
@@ -29,7 +27,19 @@ const ScreenObtainer = {
      *
      * @param {object} options
      */
-    init(options = {}) {
+    init(options: {
+        desktopSharingFrameRate?: { min: number; max: number };
+        desktopSharingResolution?: { width?: { min?: number; max?: number }; height?: { min?: number; max?: number } };
+        desktopSharingSources?: string[];
+        audioQuality?: { stereo?: boolean };
+        screenShareSettings?: {
+            desktopPreferCurrentTab?: boolean;
+            desktopSystemAudio?: 'include' | 'exclude';
+            desktopSurfaceSwitching?: 'include' | 'exclude';
+            desktopDisplaySurface?: string;
+            desktopSelfBrowserSurface?: 'include' | 'exclude';
+        };
+    } = {}) {
         this.options = options;
         this.obtainStream = this._createObtainStreamMethod();
 
@@ -47,7 +57,7 @@ const ScreenObtainer = {
      * @returns {Function}
      * @private
      */
-    _createObtainStreamMethod() {
+    _createObtainStreamMethod(): (() => Promise<MediaStream>) | null {
         const supportsGetDisplayMedia = browser.supportsGetDisplayMedia();
 
         if (browser.isElectron()) {
@@ -67,7 +77,7 @@ const ScreenObtainer = {
      *
      * @returns {Object|boolean}
      */
-    _getAudioConstraints() {
+    _getAudioConstraints(): object | boolean {
         const { audioQuality } = this.options;
         const audio = audioQuality?.stereo ? {
             autoGainControl: false,
@@ -84,7 +94,7 @@ const ScreenObtainer = {
      * environment.
      * @returns {boolean}
      */
-    isSupported() {
+    isSupported(): boolean {
         return this.obtainStream !== null;
     },
 
@@ -95,7 +105,7 @@ const ScreenObtainer = {
      * @param onFailure - Failure callback.
      * @param {Object} options - Optional parameters.
      */
-    obtainScreenOnElectron(onSuccess, onFailure, options = {}) {
+    obtainScreenOnElectron(onSuccess: (result: { stream: MediaStream; sourceId: string; sourceType: string }) => void, onFailure: (err: JitsiTrackError) => void, options: object = {}) {
         if (!this._electronSkipDisplayMedia) {
             // Fall-back to the old API in case of not supported error. This can happen if
             // an old Electron SDK is used with a new Jitsi Meet + lib-jitsi-meet version.
@@ -198,7 +208,7 @@ const ScreenObtainer = {
      * @param callback - The success callback.
      * @param errorCallback - The error callback.
      */
-    obtainScreenFromGetDisplayMedia(callback, errorCallback) {
+    obtainScreenFromGetDisplayMedia(callback: (result: { stream: MediaStream; sourceId: string }) => void, errorCallback: (err: JitsiTrackError) => void) {
         let getDisplayMedia;
 
         if (navigator.getDisplayMedia) {
@@ -339,7 +349,7 @@ const ScreenObtainer = {
      * @param callback - The success callback.
      * @param errorCallback - The error callback.
      */
-    obtainScreenFromGetDisplayMediaRN(callback, errorCallback) {
+    obtainScreenFromGetDisplayMediaRN(callback: (result: { stream: MediaStream; sourceId: string }) => void, errorCallback: (err: JitsiTrackError) => void) {
         logger.info('Using getDisplayMedia for screen sharing');
 
         navigator.mediaDevices.getDisplayMedia({ video: true })
@@ -361,7 +371,7 @@ const ScreenObtainer = {
      * @param {MediaStream} stream - The captured desktop stream.
      * @returns {void}
      */
-    setContentHint(stream) {
+    setContentHint(stream: MediaStream) {
         const { desktopSharingFrameRate } = this.options;
         const desktopTrack = stream.getVideoTracks()[0];
 
@@ -379,7 +389,7 @@ const ScreenObtainer = {
      * @param {number} maxFps capture frame rate to be used for desktop tracks.
      * @returns {void}
      */
-    setDesktopSharingFrameRate(maxFps) {
+    setDesktopSharingFrameRate(maxFps: number) {
         logger.info(`Setting the desktop capture rate to ${maxFps}`);
 
         this.options.desktopSharingFrameRate = {
