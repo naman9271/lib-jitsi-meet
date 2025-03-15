@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const ROOT_DIR = "./service"; // Change this to scan a different directory
+const ROOT_DIR = "./service";
 const OUTPUT_FILE = "repo3_architecture.md";
 
 /**
@@ -51,11 +51,9 @@ function getPercentage(migrated, total) {
   return ((migrated / total) * 100).toFixed(1);
 }
 
-// Generate architecture
 const result = scanDirectory(ROOT_DIR);
 const overallPercentage = getPercentage(result.migratedCount, result.totalCount);
 const repoStructure = `# Repository Architecture - lib-jitsi-meet\n\n📂 Root - ${overallPercentage}% migrated\n\n${result.structure}`;
 
-// Save to Markdown file
 fs.writeFileSync(OUTPUT_FILE, repoStructure);
 console.log(`✅ Repository architecture saved to ${OUTPUT_FILE}`);
