@@ -1,11 +1,29 @@
 import { Strophe } from 'strophe.js';
-
 import ConnectionPlugin from './ConnectionPlugin';
+
+/**
+ * Interface for the connection object
+ */
+interface IConnection {
+    rawInput: (stanza: string) => void;
+    rawOutput: (stanza: string) => void;
+}
+
+/**
+ * Interface for the log entry
+ */
+interface ILogEntry {
+    timestamp: number;
+    direction: 'incoming' | 'outgoing';
+    stanza: string;
+}
 
 /**
  *  Logs raw stanzas and makes them available for download as JSON
  */
 class StropheLogger extends ConnectionPlugin {
+    private log: ILogEntry[];
+
     /**
      *
      */
@@ -18,7 +36,7 @@ class StropheLogger extends ConnectionPlugin {
      *
      * @param connection
      */
-    init(connection) {
+    init(connection: IConnection) {
         super.init(connection);
         this.connection.rawInput = this.logIncoming.bind(this);
         this.connection.rawOutput = this.logOutgoing.bind(this);
@@ -28,16 +46,16 @@ class StropheLogger extends ConnectionPlugin {
      *
      * @param stanza
      */
-    logIncoming(stanza) {
-        this.log.push([ new Date().getTime(), 'incoming', stanza ]);
+    logIncoming(stanza: string) {
+        this.log.push({ timestamp: new Date().getTime(), direction: 'incoming', stanza });
     }
 
     /**
      *
      * @param stanza
      */
-    logOutgoing(stanza) {
-        this.log.push([ new Date().getTime(), 'outgoing', stanza ]);
+    logOutgoing(stanza: string) {
+        this.log.push({ timestamp: new Date().getTime(), direction: 'outgoing', stanza });
     }
 }
 
