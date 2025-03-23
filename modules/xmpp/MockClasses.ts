@@ -1,4 +1,5 @@
 import { Strophe } from 'strophe.js';
+import { WebSocket } from 'ws';
 
 import Listenable from '../util/Listenable';
 
@@ -11,14 +12,26 @@ export class MockChatRoom extends Listenable {
     /**
      * {@link ChatRoom.addPresenceListener}.
      */
-    addPresenceListener() {
+    addPresenceListener(): void {
     }
+}
+
+export interface IProto {
+    socket: WebSocket | undefined;
+}
+
+export interface IConnectCallback {
+    (status: Strophe.Status): void;
 }
 
 /**
  * Mock Strophe connection.
  */
 export class MockStropheConnection extends Listenable {
+    private sentIQs: any[];
+    private _proto: IProto;
+    private _connectCb!: IConnectCallback;
+
     /**
      * A constructor...
      */
@@ -35,21 +48,21 @@ export class MockStropheConnection extends Listenable {
      *
      * @returns {string}
      */
-    get service() {
+    get service(): string {
         return 'wss://localhost/xmpp-websocket';
     }
 
     /**
      * {@see Strophe.Connection.connect}
      */
-    connect(jid, pass, callback) {
+    connect(jid: string, pass: string, callback: IConnectCallback): void {
         this._connectCb = callback;
     }
 
     /**
      * {@see Strophe.Connection.disconnect}
      */
-    disconnect() {
+    disconnect(): void {
         this.simulateConnectionState(Strophe.Status.DISCONNECTING);
         this.simulateConnectionState(Strophe.Status.DISCONNECTED);
     }
@@ -60,9 +73,9 @@ export class MockStropheConnection extends Listenable {
      * @param {Strophe.Status} newState - The new connection status to set.
      * @returns {void}
      */
-    simulateConnectionState(newState) {
+    simulateConnectionState(newState: Strophe.Status): void {
         if (newState === Strophe.Status.CONNECTED) {
-            this._proto.socket = {
+            (this._proto.socket as any) = {
                 readyState: WebSocket.OPEN
             };
         } else {
@@ -74,7 +87,7 @@ export class MockStropheConnection extends Listenable {
     /**
      * {@see Strophe.Connection.sendIQ}.
      */
-    sendIQ(iq, resultCb) {
+    sendIQ(iq: any, resultCb?: () => void): void {
         this.sentIQs.push(iq);
         resultCb && resultCb();
     }
