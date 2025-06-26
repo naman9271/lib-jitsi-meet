@@ -33,6 +33,16 @@ const logger = getLogger('modules/xmpp/xmpp');
 */
 const FAILURE_REGEX = /<failure.*><not-allowed\/><text>(.*)<\/text><\/failure>/gi;
 
+interface CreateConnectionOptions {
+    enableWebsocketResume?: boolean;
+    serviceUrl?: string;
+    shard?: string;
+    token?: string;
+    websocketKeepAlive?: number;
+    websocketKeepAliveUrl?: string;
+    xmppPing?: any;
+}
+
 /**
  * Creates XMPP connection.
  *
@@ -54,7 +64,7 @@ function createConnection({
     token,
     websocketKeepAlive,
     websocketKeepAliveUrl,
-    xmppPing }) {
+    xmppPing }: CreateConnectionOptions): XmppConnection {
 
     // Append token as URL param
     if (token) {
@@ -63,12 +73,12 @@ function createConnection({
     }
 
     return new XmppConnection({
-        enableWebsocketResume,
-        serviceUrl,
-        websocketKeepAlive,
-        websocketKeepAliveUrl,
+        enableWebsocketResume: enableWebsocketResume as any,
+        serviceUrl: serviceUrl as any,
+        websocketKeepAlive: websocketKeepAlive as any,
+        websocketKeepAliveUrl: websocketKeepAliveUrl as any,
         xmppPing,
-        shard
+        shard: shard as any
     });
 }
 
@@ -78,7 +88,7 @@ function createConnection({
  *
  * @returns {void}
  */
-function initStropheNativePlugins() {
+function initStropheNativePlugins(): void {
     initStropheUtil();
     initStropheLogger();
 }
@@ -87,7 +97,7 @@ function initStropheNativePlugins() {
 /**
  * A list of ice servers to use by default for P2P.
  */
-export const DEFAULT_STUN_SERVERS = [
+export const DEFAULT_STUN_SERVERS: { urls: string }[] = [
     { urls: 'stun:meet-jit-si-turnrelay.jitsi.net:443' }
 ];
 
@@ -97,37 +107,112 @@ export const DEFAULT_STUN_SERVERS = [
  * If the json-message of a chat message contains a valid JSON object, and
  * the JSON has this key, then it is a valid json-message to be sent.
  */
-export const JITSI_MEET_MUC_TYPE = 'type';
+export const JITSI_MEET_MUC_TYPE: string = 'type';
 
 /**
  * The feature used by jigasi participants.
  * @type {string}
  */
-export const FEATURE_JIGASI = 'http://jitsi.org/protocol/jigasi';
+export const FEATURE_JIGASI: string = 'http://jitsi.org/protocol/jigasi';
 
 /**
  * The feature used by jibri participants.
  * @type {string}
  */
-export const FEATURE_JIBRI = 'http://jitsi.org/protocol/jibri';
+export const FEATURE_JIBRI: string = 'http://jitsi.org/protocol/jibri';
 
 /**
  * The feature used by jigasi transcriber participants.
  * @type {string}
  */
-export const FEATURE_TRANSCRIBER = 'http://jitsi.org/protocol/transcriber';
+export const FEATURE_TRANSCRIBER: string = 'http://jitsi.org/protocol/transcriber';
 
 /**
  * The feature used by the lib to mark support for e2ee. We use the feature by putting it in the presence
  * to avoid additional signaling (disco-info).
  * @type {string}
  */
-export const FEATURE_E2EE = 'https://jitsi.org/meet/e2ee';
+export const FEATURE_E2EE: string = 'https://jitsi.org/meet/e2ee';
+
+interface XMPPOptions {
+    serviceUrl?: string;
+    bosh?: string;
+    enableWebsocketResume?: boolean;
+    websocketKeepAlive?: number;
+    websocketKeepAliveUrl?: string;
+    xmppPing?: {
+        domain?: string;
+        [key: string]: unknown;
+    };
+    p2pStunServers?: Array<{ urls: string }>;
+    deploymentInfo?: {
+        shard?: string;
+        region?: string;
+        backendRelease?: string;
+        [key: string]: unknown;
+    };
+    hosts?: {
+        domain?: string;
+        anonymousdomain?: string;
+        muc?: string;
+        [key: string]: unknown;
+    };
+    disableRtx?: boolean;
+    enableOpusRed?: boolean;
+    enableRemb?: boolean;
+    enableTcc?: boolean;
+    disableBeforeUnloadHandlers?: boolean;
+    testing?: {
+        enableGracefulReconnect?: boolean;
+        [key: string]: unknown;
+    };
+    p2p?: {
+        stunServers?: Array<{ urls: string }>;
+        iceTransportPolicy?: string;
+        [key: string]: unknown;
+    };
+    [key: string]: unknown;
+}
+
+interface ConnectionTimes {
+    [key: string]: number;
+}
+
+interface BreakoutRoomsFeatures {
+    rename?: boolean;
+    [key: string]: unknown;
+}
 
 /**
  *
  */
 export default class XMPP extends Listenable {
+    connection: any;
+    disconnectInProgress: Promise<void> | undefined;
+    connectionTimes: ConnectionTimes;
+    options: XMPPOptions;
+    token?: string;
+    authenticatedUser: boolean;
+    _components: string[];
+    _preComponentsMsgs: Element[];
+    moderator: Moderator;
+    caps: Caps;
+    _sysMessageHandler: number | null;
+    sendDiscoInfo: boolean;
+    sendDeploymentInfo: boolean;
+    anonymousConnectionFailed: boolean;
+    connectionFailed: boolean;
+    lastErrorMsg: string | undefined;
+    _startConnecting: boolean;
+    avModerationComponentAddress?: string;
+    endConferenceComponentAddress?: string;
+    speakerStatsComponentAddress?: string;
+    lobbySupported?: boolean;
+    breakoutRoomsComponentAddress?: string;
+    breakoutRoomsFeatures?: BreakoutRoomsFeatures;
+    fileSharingComponentAddress?: string;
+    roomMetadataComponentAddress?: string;
+
     /**
      * FIXME describe all options
      * @param {Object} options
@@ -143,7 +228,7 @@ export default class XMPP extends Listenable {
      * @param {Array<Object>} options.p2pStunServers see {@link JingleConnectionPlugin} for more details.
      * @param token
      */
-    constructor(options, token) {
+    constructor(options: XMPPOptions, token?: string) {
         super();
 
         if (options.bosh && !options.serviceUrl) {
@@ -151,7 +236,7 @@ export default class XMPP extends Listenable {
         }
 
         this.connection = null;
-        this.disconnectInProgress = false;
+        this.disconnectInProgress = undefined;
         this.connectionTimes = {};
         this.options = options;
         this.token = token;
@@ -182,7 +267,7 @@ export default class XMPP extends Listenable {
             websocketKeepAlive: options.websocketKeepAlive,
             websocketKeepAliveUrl: options.websocketKeepAliveUrl,
             xmppPing,
-            shard: options.deploymentInfo.shard
+            shard: options.deploymentInfo?.shard
         });
 
         this.moderator = new Moderator(this);
@@ -267,12 +352,12 @@ export default class XMPP extends Listenable {
 
         // Disable TCC on Firefox 114 and older versions because of a known issue where BWE is halved on every
         // renegotiation.
-        if (!(browser.isFirefox() && browser.isVersionLessThan(115))
+        if (!((browser as any).isFirefox && (browser as any).isFirefox() && (browser as any).isVersionLessThan && (browser as any).isVersionLessThan(115))
             && (typeof this.options.enableTcc === 'undefined' || this.options.enableTcc)) {
             this.caps.addFeature('http://jitsi.org/tcc');
         }
 
-        if (this.connection.rayo) {
+        if ((this.connection as any).rayo) {
             this.caps.addFeature('urn:xmpp:rayo:client:1');
         }
 
@@ -320,7 +405,7 @@ export default class XMPP extends Listenable {
      * @param {string} status - One of Strophe's connection status strings.
      * @param {string} [msg] - The connection error message provided by Strophe.
      */
-    connectionHandler(credentials = {}, status, msg) {
+    connectionHandler(credentials: { jid?: string; password?: string } = {}, status: number, msg?: string) {
         const now = window.performance.now();
         const statusStr = Strophe.getStatusString(status).toLowerCase();
 
@@ -330,7 +415,7 @@ export default class XMPP extends Listenable {
             now);
 
         this.eventEmitter.emit(XMPPEvents.CONNECTION_STATUS_CHANGED, credentials, status, msg);
-        this._maybeSendDeploymentInfoStat();
+        this._maybeSendDeploymentInfoStat(false);
         if (status === Strophe.Status.CONNECTED || status === Strophe.Status.ATTACHED) {
             // once connected or attached we no longer need this handle, drop it if it exist
             if (this._sysMessageHandler) {
@@ -338,7 +423,7 @@ export default class XMPP extends Listenable {
                 this._sysMessageHandler = null;
             }
 
-            this.sendDiscoInfo && this.connection.jingle.getStunAndTurnCredentials();
+            this.sendDiscoInfo && (this.connection as any).jingle?.getStunAndTurnCredentials();
 
             logger.info(`My Jabber ID: ${this.connection.jid}`);
 
@@ -347,8 +432,9 @@ export default class XMPP extends Listenable {
 
             // make sure we will send the info after the features request succeeds or fails
             this.sendDeploymentInfo = false;
-            this.sendDiscoInfo && this.caps.getFeaturesAndIdentities(this.options.hosts.domain)
-                .then(({ features, identities }) => {
+            this.sendDiscoInfo && this.caps.getFeaturesAndIdentities(this.options.hosts!.domain!, '')
+                .then((result: any) => {
+                    const { features, identities } = result;
                     if (!features.has(Strophe.NS.PING)) {
                         logger.error(`Ping NOT supported by ${
                             this.options.hosts.domain} - please enable ping in your XMPP server config`);
@@ -393,7 +479,7 @@ export default class XMPP extends Listenable {
             this.lastErrorMsg = msg;
         } else if (status === Strophe.Status.DISCONNECTED) {
             // Stop ping interval
-            this.connection.ping.stopInterval();
+            (this.connection as any).ping?.stopInterval();
             const wasIntentionalDisconnect = Boolean(this.disconnectInProgress);
             const errMsg = msg || this.lastErrorMsg;
 
@@ -459,7 +545,7 @@ export default class XMPP extends Listenable {
      * for more features.
      * @private
      */
-    _processDiscoInfoIdentities(identities, features) {
+    _processDiscoInfoIdentities(identities: Set<{type: string; name: string; category?: string}>, features?: Set<string>): void {
         // check for speakerstats
         identities.forEach(identity => {
             if (identity.type === 'av_moderation') {
@@ -909,7 +995,7 @@ export default class XMPP extends Listenable {
      *
      */
     _initStrophePlugins() {
-        const iceConfig = {
+        const iceConfig: any = {
             jvb: { iceServers: [ ] },
             p2p: { iceServers: [ ] }
         };
@@ -941,25 +1027,25 @@ export default class XMPP extends Listenable {
      * @returns {object} contains details about a connection failure.
      * @private
      */
-    _getConnectionFailedReasonDetails() {
-        const details = {};
+    _getConnectionFailedReasonDetails(): { [key: string]: any } {
+        const details: { [key: string]: any } = {};
 
         // check for moving between shard if information is available
         if (this.options.deploymentInfo
             && this.options.deploymentInfo.shard
-            && this.connection.lastResponseHeaders) {
+            && this.connection!.lastResponseHeaders) {
 
             // split headers by line
-            const headersArr = this.connection.lastResponseHeaders
+            const headersArr = this.connection!.lastResponseHeaders
                 .trim().split(/[\r\n]+/);
-            const headers = {};
+            const headers: { [key: string]: string } = {};
 
             headersArr.forEach(line => {
                 const parts = line.split(': ');
                 const header = parts.shift();
                 const value = parts.join(': ');
 
-                headers[header] = value;
+                headers[header!] = value;
             });
 
             /* eslint-disable camelcase */
@@ -971,8 +1057,8 @@ export default class XMPP extends Listenable {
 
         /* eslint-disable camelcase */
         // check for possible suspend
-        details.suspend_time = this.connection.ping.getPingSuspendTime();
-        details.time_since_last_success = this.connection.getTimeSinceLastSuccess();
+        details.suspend_time = this.connection!.ping?.getPingSuspendTime();
+        details.time_since_last_success = this.connection!.getTimeSinceLastSuccess();
         /* eslint-enable camelcase */
 
         return details;
@@ -1138,7 +1224,7 @@ export default class XMPP extends Listenable {
         const aprops = this.options.deploymentInfo;
 
         if (aprops && Object.keys(aprops).length > 0) {
-            const logObject = {};
+            const logObject: any = {};
 
             for (const attr in aprops) {
                 if (aprops.hasOwnProperty(attr)) {
