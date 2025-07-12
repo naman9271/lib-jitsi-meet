@@ -7,10 +7,6 @@ import EventEmitter, { EventListener } from './EventEmitter';
  */
 export default class Listenable {
     public eventEmitter: EventEmitter;
-    public addEventListener: typeof EventEmitter.prototype.addListener;
-    public removeEventListener: typeof EventEmitter.prototype.removeListener;
-    public on: typeof EventEmitter.prototype.addListener;
-    public off: typeof EventEmitter.prototype.removeListener;
 
     /**
      * Creates new instance.
@@ -18,10 +14,47 @@ export default class Listenable {
      */
     constructor() {
         this.eventEmitter = new EventEmitter();
+    }
 
-        // aliases for addListener/removeListener
-        this.addEventListener = this.on = this.addListener;
-        this.removeEventListener = this.off = this.removeListener;
+    /**
+   * Attaches a handler for events (e.g., "participant joined") in the conference.
+   * All possible events are defined in JitsiConferenceEvents.
+   * @param {string} eventId - The event ID.
+   * @param {Function} handler - Handler for the event.
+   */
+    on(eventId: string, handler: EventListener): void {
+        if (this.eventEmitter) {
+            this.eventEmitter.on(eventId, handler);
+        }
+    }
+
+        /**
+   * Removes event listener.
+   * @param {string} eventId - The event ID.
+   * @param {Function} [handler] - Optional, the specific handler to unbind.
+   */
+    off(eventId: string, handler?: EventListener): void {
+        if (this.eventEmitter) {
+            this.eventEmitter.removeListener(eventId, handler);
+        }
+    }
+
+    /**
+     * Alias for on method.
+     * @param {string} eventId - The event ID.
+     * @param {Function} handler - Handler for the event.
+     */
+    addEventListener(eventId: string, handler: EventListener): void {
+        this.on(eventId, handler);
+    }
+
+    /**
+     * Alias for off method.
+     * @param {string} eventId - The event ID.
+     * @param {Function} [handler] - Optional, the specific handler to unbind.
+     */
+    removeEventListener(eventId: string, handler?: EventListener): void {
+        this.off(eventId, handler);
     }
 
     /**
