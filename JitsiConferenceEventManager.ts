@@ -47,6 +47,17 @@ export default class JitsiConferenceEventManager {
     }
 
     /**
+     * Add XMPP listener and save its reference for remove on leave conference.
+     * @param {string} eventName - The event name.
+     * @param {Function} listener - The listener function.
+     * @private
+     */
+    private _addConferenceXMPPListener(eventName: string, listener: (...args: any[]) => void): void { // Todo
+        this.xmppListeners[eventName] = listener;
+        this.conference.xmpp.addListener(eventName, listener);
+    }
+
+    /**
      * Setups event listeners related to conference.chatRoom
      */
     setupChatRoomListeners(): void {
@@ -565,17 +576,47 @@ export default class JitsiConferenceEventManager {
     }
 
     /**
-     * Removes event listeners related to conference.xmpp
+     * Setups event listeners related to conference.statistics
      */
-    removeXMPPListeners(): void {
+    setupStatisticsListeners(): void {
         const conference = this.conference;
 
-        Object.keys(this.xmppListeners).forEach(eventName => {
-            conference.xmpp.removeListener(
-                eventName,
-                this.xmppListeners[eventName]);
+        if (!conference.statistics) {
+            return;
+        }
+
+        /* eslint-disable max-params */
+        conference.statistics.addAudioLevelListener((tpc: TraceablePeerConnection, ssrc: number, level: number, isLocal: boolean) => {
+            conference.rtc.setAudioLevel(tpc, ssrc, level, isLocal);
         });
-        this.xmppListeners = {};
+
+        /* eslint-enable max-params */
+
+        // Forward the "before stats disposed" event
+        conference.statistics.addBeforeDisposedListener(() => {
+            conference.eventEmitter.emit(
+                JitsiConferenceEvents.BEFORE_STATISTICS_DISPOSED);
+        });
+
+        conference.statistics.addEncodeTimeStatsListener((tpc: TraceablePeerConnection, stats: RTCEncodedAudioFrameMetadata) => {
+            conference.eventEmitter.emit(
+                JitsiConferenceEvents.ENCODE_TIME_STATS_RECEIVED, tpc, stats);
+        });
+
+        // if we are in startSilent mode we will not be sending/receiving so nothing to detect
+        if (!conference.options.config.startSilent) {
+            conference.statistics.addByteSentStatsListener((tpc: TraceablePeerConnection, stats: RTCEncodedAudioFrameMetadata) => {
+                conference.getLocalTracks(MediaType.AUDIO).forEach(track => {
+                    const ssrc = tpc.getLocalSSRC(track);
+
+                    if (!ssrc || !stats.hasOwnProperty(ssrc)) {
+                        return;
+                    }
+
+                    track.onByteSentStatsReceived(tpc, stats[ssrc]);
+                });
+            });
+        }
     }
 
     /**
@@ -642,58 +683,18 @@ export default class JitsiConferenceEventManager {
             () => conference.eventEmitter.emit(JitsiConferenceEvents.VISITORS_REJECTION));
     }
 
-    /**
-     * Add XMPP listener and save its reference for remove on leave conference.
-     * @param {string} eventName - The event name.
-     * @param {Function} listener - The listener function.
-     * @private
-     */
-    _addConferenceXMPPListener(eventName: string, listener: (...args: any[]) => void): void { // Todo
-        this.xmppListeners[eventName] = listener;
-        this.conference.xmpp.addListener(eventName, listener);
-    }
 
     /**
-     * Setups event listeners related to conference.statistics
+     * Removes event listeners related to conference.xmpp
      */
-    setupStatisticsListeners(): void {
+    removeXMPPListeners(): void {
         const conference = this.conference;
 
-        if (!conference.statistics) {
-            return;
-        }
-
-        /* eslint-disable max-params */
-        conference.statistics.addAudioLevelListener((tpc: TraceablePeerConnection, ssrc: number, level: number, isLocal: boolean) => {
-            conference.rtc.setAudioLevel(tpc, ssrc, level, isLocal);
+        Object.keys(this.xmppListeners).forEach(eventName => {
+            conference.xmpp.removeListener(
+                eventName,
+                this.xmppListeners[eventName]);
         });
-
-        /* eslint-enable max-params */
-
-        // Forward the "before stats disposed" event
-        conference.statistics.addBeforeDisposedListener(() => {
-            conference.eventEmitter.emit(
-                JitsiConferenceEvents.BEFORE_STATISTICS_DISPOSED);
-        });
-
-        conference.statistics.addEncodeTimeStatsListener((tpc: TraceablePeerConnection, stats: RTCEncodedAudioFrameMetadata) => {
-            conference.eventEmitter.emit(
-                JitsiConferenceEvents.ENCODE_TIME_STATS_RECEIVED, tpc, stats);
-        });
-
-        // if we are in startSilent mode we will not be sending/receiving so nothing to detect
-        if (!conference.options.config.startSilent) {
-            conference.statistics.addByteSentStatsListener((tpc: TraceablePeerConnection, stats: RTCEncodedAudioFrameMetadata) => {
-                conference.getLocalTracks(MediaType.AUDIO).forEach(track => {
-                    const ssrc = tpc.getLocalSSRC(track);
-
-                    if (!ssrc || !stats.hasOwnProperty(ssrc)) {
-                        return;
-                    }
-
-                    track.onByteSentStatsReceived(tpc, stats[ssrc]);
-                });
-            });
-        }
+        this.xmppListeners = {};
     }
 }
