@@ -289,23 +289,30 @@ export default class ConnectionQuality {
     }
 
     /**
-     * Resets the time video was unmuted and triggers a new ramp-up.
-     *
-     * @private
-     * @returns {void}
+     * Broadcasts the local statistics to all other participants in the
+     * conference.
      */
-    _resetVideoUnmuteTime(): void {
-        this._timeVideoUnmuted = -1;
-        this._maybeUpdateUnmuteTime();
-    }
+    private _broadcastLocalStats(): void {
+        // broadcasting local stats is disabled
+        if (this._options.config.disableLocalStatsBroadcast) {
+            return;
+        }
 
-    /**
-     * Sets _timeVideoUnmuted if it was previously unset. If it was already set,
-     * doesn't change it.
-     */
-    _maybeUpdateUnmuteTime(): void {
-        if (this._timeVideoUnmuted < 0) {
-            this._timeVideoUnmuted = window.performance.now();
+        // Send only the data that remote participants care about.
+        const data = {
+            bitrate: this._localStats.bitrate,
+            connectionQuality: this._localStats.connectionQuality,
+            jvbRTT: this._localStats.jvbRTT,
+            maxEnabledResolution: this._localStats.maxEnabledResolution,
+            packetLoss: this._localStats.packetLoss,
+            serverRegion: this._localStats.serverRegion
+        };
+
+        try {
+            this._conference.sendEndpointStatsMessage(data);
+        } catch (err) {
+            // Ignore the error as we might hit it in the beginning of the call before the channel is ready.
+            // The statistics will be sent again after few seconds and error is logged elseware as well.
         }
     }
 
@@ -316,7 +323,7 @@ export default class ConnectionQuality {
      * @param resolutionName {Resolution} the input resolution used by the camera.
      * @returns {*} the newly calculated connection quality.
      */
-    _calculateConnectionQuality(videoType: VideoType, isMuted: boolean, resolutionName: keyof typeof Resolutions): number {
+    private _calculateConnectionQuality(videoType: VideoType, isMuted: boolean, resolutionName: keyof typeof Resolutions): number {
 
         // resolutionName is an index into Resolutions (where "720" is
         // "1280x720" and "960" is "960x720" ...).
@@ -396,40 +403,33 @@ export default class ConnectionQuality {
     }
 
     /**
-     * Updates the localConnectionQuality value
-     * @param values {number} the new value. Should be in [0, 100].
+     * Sets _timeVideoUnmuted if it was previously unset. If it was already set,
+     * doesn't change it.
      */
-    _updateLocalConnectionQuality(value: number): void {
-        this._localStats.connectionQuality = value;
-        this._lastConnectionQualityUpdate = window.performance.now();
+    private _maybeUpdateUnmuteTime(): void {
+        if (this._timeVideoUnmuted < 0) {
+            this._timeVideoUnmuted = window.performance.now();
+        }
     }
 
     /**
-     * Broadcasts the local statistics to all other participants in the
-     * conference.
+     * Resets the time video was unmuted and triggers a new ramp-up.
+     *
+     * @private
+     * @returns {void}
      */
-    _broadcastLocalStats(): void {
-        // broadcasting local stats is disabled
-        if (this._options.config.disableLocalStatsBroadcast) {
-            return;
-        }
+    private _resetVideoUnmuteTime(): void {
+        this._timeVideoUnmuted = -1;
+        this._maybeUpdateUnmuteTime();
+    }
 
-        // Send only the data that remote participants care about.
-        const data = {
-            bitrate: this._localStats.bitrate,
-            connectionQuality: this._localStats.connectionQuality,
-            jvbRTT: this._localStats.jvbRTT,
-            maxEnabledResolution: this._localStats.maxEnabledResolution,
-            packetLoss: this._localStats.packetLoss,
-            serverRegion: this._localStats.serverRegion
-        };
-
-        try {
-            this._conference.sendEndpointStatsMessage(data);
-        } catch (err) {
-            // Ignore the error as we might hit it in the beginning of the call before the channel is ready.
-            // The statistics will be sent again after few seconds and error is logged elseware as well.
-        }
+    /**
+     * Updates the localConnectionQuality value
+     * @param values {number} the new value. Should be in [0, 100].
+     */
+    private _updateLocalConnectionQuality(value: number): void {
+        this._localStats.connectionQuality = value;
+        this._lastConnectionQualityUpdate = window.performance.now();
     }
 
     /**
@@ -438,7 +438,7 @@ export default class ConnectionQuality {
      * the stats
      * @param data new statistics
      */
-    _updateLocalStats(tpc: TraceablePeerConnection, data: { transport: { rtt: number; }[]; }): void {
+    private _updateLocalStats(tpc: TraceablePeerConnection, data: { transport: { rtt: number; }[]; }): void {
         // Update jvbRTT
         if (!tpc.isP2P) {
             const jvbRTT
@@ -499,7 +499,7 @@ export default class ConnectionQuality {
      * @param id the id of the remote participant
      * @param data the statistics received
      */
-    _updateRemoteStats(id: string, data: IRemoteStatsData): void {
+    private _updateRemoteStats(id: string, data: IRemoteStatsData): void {
         // Use only the fields we need
         this._remoteStats[id] = {
             bitrate: data.bitrate,
@@ -520,7 +520,7 @@ export default class ConnectionQuality {
      * Returns the local statistics.
      * Exported only for use in jitsi-meet-torture.
      */
-    getStats(): ILocalStats {
+    public getStats(): ILocalStats {
         return this._localStats;
     }
 }
