@@ -15,7 +15,7 @@
 /*
  * Calculate the SHA-1 of an array of big-endian words, and a bit length
  */
-function core_sha1(x, len) {
+function core_sha1(x: number[], len: number): number[] {
     /* append padding */
     x[len >> 5] |= 0x80 << (24 - len % 32);
     x[((len + 64 >> 9) << 4) + 15] = len;
@@ -27,7 +27,7 @@ function core_sha1(x, len) {
     var d =  271733878;
     var e = -1009589776;
 
-    var i, j, t, olda, oldb, oldc, oldd, olde;
+    var i: number, j: number, t: number, olda: number, oldb: number, oldc: number, oldd: number, olde: number;
     for (i = 0; i < x.length; i += 16) {
         olda = a;
         oldb = b;
@@ -64,7 +64,7 @@ function core_sha1(x, len) {
  * Perform the appropriate triplet combination function for the current
  * iteration
  */
-function sha1_ft (t, b, c, d) {
+function sha1_ft (t: number, b: number, c: number, d: number) {
     if (t < 20) { return (b & c) | ((~b) & d); }
     if (t < 40) { return b ^ c ^ d; }
     if (t < 60) { return (b & c) | (b & d) | (c & d); }
@@ -74,20 +74,21 @@ function sha1_ft (t, b, c, d) {
 /*
  * Determine the appropriate additive constant for the current iteration
  */
-function sha1_kt(t) {
+function sha1_kt(t: number) {
     return (t < 20) ?  1518500249 : (t < 40) ?  1859775393 : (t < 60) ? -1894007588 : -899497514;
 }
 
 /*
  * Calculate the HMAC-SHA1 of a key and some data
  */
-function core_hmac_sha1(key, data) {
+function core_hmac_sha1(key: string, data: string) {
     var bkey = str2binb(key);
     if (bkey.length > 16) {
         bkey = core_sha1(bkey, key.length * 8);
     }
 
-    var ipad = new Array(16), opad = new Array(16);
+    var ipad = new Array(16);
+    var opad = new Array(16);
     for (var i = 0; i < 16; i++) {
         ipad[i] = bkey[i] ^ 0x36363636;
         opad[i] = bkey[i] ^ 0x5C5C5C5C;
@@ -101,7 +102,7 @@ function core_hmac_sha1(key, data) {
  * Add integers, wrapping at 2^32. This uses 16-bit operations internally
  * to work around bugs in some JS interpreters.
  */
-function safe_add(x, y) {
+function safe_add(x: number, y: number) {
     var lsw = (x & 0xFFFF) + (y & 0xFFFF);
     var msw = (x >> 16) + (y >> 16) + (lsw >> 16);
     return (msw << 16) | (lsw & 0xFFFF);
@@ -110,7 +111,7 @@ function safe_add(x, y) {
 /*
  * Bitwise rotate a 32-bit number to the left.
  */
-function rol(num, cnt) {
+function rol(num: number, cnt: number) {
     return (num << cnt) | (num >>> (32 - cnt));
 }
 
@@ -118,7 +119,7 @@ function rol(num, cnt) {
  * Convert an 8-bit or 16-bit string to an array of big-endian words
  * In 8-bit function, characters >255 have their hi-byte silently ignored.
  */
-function str2binb(str) {
+function str2binb(str: string) {
     var bin = [];
     var mask = 255;
     for (var i = 0; i < str.length * 8; i += 8) {
@@ -130,7 +131,7 @@ function str2binb(str) {
 /*
  * Convert an array of big-endian words to a base-64 string
  */
-function binb2b64 (binarray) {
+function binb2b64 (binarray: number[]) {
     var tab = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     var str = "";
     var triplet, j;
@@ -150,7 +151,7 @@ function binb2b64 (binarray) {
 /*
  * Convert an array of big-endian words to a string
  */
-function binb2str(bin) {
+function binb2str(bin: number[]) {
     var str = "";
     var mask = 255;
     for (var i = 0; i < bin.length * 32; i += 8) {
@@ -164,8 +165,8 @@ function binb2str(bin) {
  * They take string arguments and return either hex or base-64 encoded strings
  */
 const SHA1 = {
-    b64_hmac_sha1:  function (key, data){ return binb2b64(core_hmac_sha1(key, data)); },
-    b64_sha1:       function (s) { return binb2b64(core_sha1(str2binb(s),s.length * 8)); },
+    b64_hmac_sha1:  function (key: string, data: string){ return binb2b64(core_hmac_sha1(key, data)); },
+    b64_sha1:       function (s: string) { return binb2b64(core_sha1(str2binb(s),s.length * 8)); },
     binb2str:       binb2str,
     core_hmac_sha1: core_hmac_sha1,
     str_hmac_sha1:  function (key, data){ return binb2str(core_hmac_sha1(key, data)); },
