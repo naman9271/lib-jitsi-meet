@@ -191,6 +191,8 @@ export default class JitsiConference {
          */
         this.jvbJingleSession = null;
         this.lastDominantSpeaker = null;
+        this.dominantSpeakerIsSilent = null;
+        this.authIdentity = null;
         this.dtmfManager = null;
         this.somebodySupportsDTMF = false;
         this.authEnabled = false;
@@ -1844,7 +1846,7 @@ export default class JitsiConference {
     /**
      * Get notified when we joined the room.
      *
-     * @private
+     * @internal
      */
     _onMucJoined() {
         this._numberOfParticipantsOnJoin = this.getParticipantCount();
@@ -1878,7 +1880,7 @@ export default class JitsiConference {
      * Get notified when member bot type had changed.
      * @param jid the member jid
      * @param botType the new botType value
-     * @private
+     * @internal
      */
     _onMemberBotTypeChanged(jid, botType) {
 
@@ -2485,7 +2487,7 @@ export default class JitsiConference {
     /**
      * Handles the suspend detected event. Leaves the room and fires suspended.
      * @param {JingleSessionPC} jingleSession - The Jingle session.
-     * @private
+     * @internal
      */
     onSuspendDetected(jingleSession) {
         if (!jingleSession.isP2P) {
@@ -2709,7 +2711,7 @@ export default class JitsiConference {
      * @param {boolean} audio - Whether audio should be muted.
      * @param {boolean} video - Whether video should be muted.
      * @returns {void}
-     * @private
+     * @internal
      */
     _updateStartMutedPolicy(audio, video) {
         // Update the start muted policy for the conference only if the meta data is received before conference join.
