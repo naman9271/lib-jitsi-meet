@@ -23,7 +23,7 @@ import IceFailedHandling from './modules/connectivity/IceFailedHandling';
 import * as DetectionEvents from './modules/detection/DetectionEvents';
 import NoAudioSignalDetection from './modules/detection/NoAudioSignalDetection';
 import P2PDominantSpeakerDetection from './modules/detection/P2PDominantSpeakerDetection';
-import VADAudioAnalyser from './modules/detection/VADAudioAnalyser';
+import VADAudioAnalyser, { IVADProcessor } from './modules/detection/VADAudioAnalyser';
 import VADNoiseDetection from './modules/detection/VADNoiseDetection';
 import VADTalkMutedDetection from './modules/detection/VADTalkMutedDetection';
 import { E2EEncryption } from './modules/e2ee/E2EEncryption';
@@ -99,7 +99,7 @@ export interface IConferenceOptions {
         avgRtpStatsN?: number;
         channelLastN?: number;
         confID?: string;
-        createVADProcessor?: () => Promise<MediaStreamTrack>;
+        createVADProcessor?: () => IVADProcessor;
         deploymentInfo?: {
             userRegion?: string;
         };
