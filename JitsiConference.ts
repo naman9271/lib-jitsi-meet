@@ -258,6 +258,7 @@ export default class JitsiConference extends Listenable {
     private _videoSenderLimitReached?: boolean;
     private _firefoxP2pEnabled: boolean;
     private _iceRestarts: number;
+    private _unsubscribers: Array<() => void>;
     public _statsCurrentId: string;
     public connection: JitsiConnection;
     public xmpp: XMPP;
@@ -301,7 +302,6 @@ export default class JitsiConference extends Listenable {
     public jvbEstablishmentDuration?: number;
     public isDesktopMutedByFocus: boolean;
     public mutedDesktopByFocusActor?: string;
-
 
     /**
      * @param {IConferenceOptions} options
@@ -494,6 +494,8 @@ export default class JitsiConference extends Listenable {
          * Number of times ICE restarts that have been attempted after ICE connectivity with the JVB was lost.
          */
         this._iceRestarts = 0;
+
+        this._unsubscribers = [];
     }
 
     /**
@@ -1387,10 +1389,8 @@ export default class JitsiConference extends Listenable {
     onLocalTrackRemoved(track: JitsiLocalTrack): void {
         track.setConference(null);
         this.rtc.removeLocalTrack(track);
-        track.removeEventListener(JitsiTrackEvents.TRACK_MUTE_CHANGED, this._fireMuteChangeEvent.bind(this, track));
-        if (track.isAudioTrack()) {
-            track.removeEventListener(JitsiTrackEvents.TRACK_AUDIO_LEVEL_CHANGED, this._fireAudioLevelChangeEvent.bind(this));
-        }
+        this._unsubscribers.forEach(remove => remove());
+        this._unsubscribers = [];
 
         this.eventEmitter.emit(JitsiConferenceEvents.TRACK_REMOVED, track);
     }
@@ -1547,10 +1547,10 @@ export default class JitsiConference extends Listenable {
 
 
         // Add event handlers.
-        newTrack.addEventListener(JitsiTrackEvents.TRACK_MUTE_CHANGED, this._fireMuteChangeEvent.bind(this, newTrack));
+        this._unsubscribers.push(newTrack.addCancellableListener(JitsiTrackEvents.TRACK_MUTE_CHANGED, this._fireMuteChangeEvent.bind(this, newTrack)));
 
         if (newTrack.isAudioTrack()) {
-            newTrack.addEventListener(JitsiTrackEvents.TRACK_AUDIO_LEVEL_CHANGED, this._fireAudioLevelChangeEvent.bind(this));
+            this._unsubscribers.push(newTrack.addCancellableListener(JitsiTrackEvents.TRACK_AUDIO_LEVEL_CHANGED, this._fireAudioLevelChangeEvent.bind(this)));
         }
 
         this.eventEmitter.emit(JitsiConferenceEvents.TRACK_ADDED, newTrack);
@@ -2294,7 +2294,6 @@ export default class JitsiConference extends Listenable {
             const tracks = participant.getTracks();
 
             for (let i = 0; i < tracks.length; i++) {
-                // Compare by a unique property to avoid type incompatibility
                 if (tracks[i] === removedTrack) {
                     // Since the tracks have been compared and are
                     // considered equal the result of splice can be ignored.
