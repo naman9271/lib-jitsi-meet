@@ -97,4 +97,11 @@ export default class Listenable {
     emit(event: string, ...args: any[]): void {
         this.eventEmitter.emit(event, ...args);
     }
+
+    /**
+     * Removes all listeners for the event emitter.
+     */
+    removeAllListeners(): void {
+        this.eventEmitter.removeAllListeners();
+    }
 }
