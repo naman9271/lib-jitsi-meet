@@ -5,10 +5,12 @@ import { $iq, Strophe } from 'strophe.js';
 import { XMPPEvents } from '../../service/xmpp/XMPPEvents';
 import RandomUtil from '../util/RandomUtil';
 import $ from '../util/XMLParser';
+import EventEmitter from '../util/EventEmitter';
 
 import ConnectionPlugin from './ConnectionPlugin';
 import { expandSourcesFromJson } from './JingleHelperFunctions';
 import JingleSessionPC from './JingleSessionPC';
+import XMPP from './xmpp';
 
 const logger = getLogger('modules/xmpp/strophe.jingle');
 
@@ -22,14 +24,14 @@ const logger = getLogger('modules/xmpp/strophe.jingle');
  * @param {*} transport Transport XML element extracted from the IQ.
  * @returns {Array<string>}
  */
-function _parseIceCandidates(transport) {
+function _parseIceCandidates(transport: any): string[] {
     const candidates = $(transport).find('>candidate');
-    const parseCandidates = [];
+    const parseCandidates: string[] = [];
 
     // Extract the candidate information from the IQ.
     candidates.each((_, candidate) => {
         const attributes = candidate.attributes;
-        const candidateAttrs = [];
+        const candidateAttrs: string[] = [];
 
         for (let i = 0; i < attributes.length; i++) {
             const attr = attributes[i];
@@ -46,6 +48,13 @@ function _parseIceCandidates(transport) {
  *
  */
 export default class JingleConnectionPlugin extends ConnectionPlugin {
+    xmpp: XMPP;
+    eventEmitter: EventEmitter;
+    sessions: { [sessionId: string]: JingleSessionPC };
+    jvbIceConfig: any;
+    p2pIceConfig: any;
+    mediaConstraints: RTCOfferOptions;
+
     /**
      * Creates new <tt>JingleConnectionPlugin</tt>
      * @param {XMPP} xmpp
@@ -53,7 +62,7 @@ export default class JingleConnectionPlugin extends ConnectionPlugin {
      * @param {Object} iceConfig an object that holds the iceConfig to be passed
      * to the p2p and the jvb <tt>PeerConnection</tt>.
      */
-    constructor(xmpp, eventEmitter, iceConfig) {
+    constructor(xmpp: XMPP, eventEmitter: EventEmitter, iceConfig: any) {
         super();
         this.xmpp = xmpp;
         this.eventEmitter = eventEmitter;
@@ -70,7 +79,7 @@ export default class JingleConnectionPlugin extends ConnectionPlugin {
      *
      * @param connection
      */
-    init(connection) {
+    init(connection: ): void {
         super.init(connection);
         this.connection.addHandler(this.onJingle.bind(this),
             'urn:xmpp:jingle:1', 'iq', 'set', null, null);
@@ -80,10 +89,10 @@ export default class JingleConnectionPlugin extends ConnectionPlugin {
      *
      * @param iq
      */
-    onJingle(iq) {
-        const sid = $(iq).find('jingle').attr('sid');
-        const action = $(iq).find('jingle').attr('action');
-        const fromJid = iq.getAttribute('from');
+    onJingle(iq: Element): boolean {
+        const sid: string = $(iq).find('jingle').attr('sid');
+        const action: string = $(iq).find('jingle').attr('action');
+        const fromJid: string = iq.getAttribute('from');
 
         // send ack first
         const ack = $iq({ id: iq.getAttribute('id'),
@@ -91,7 +100,7 @@ export default class JingleConnectionPlugin extends ConnectionPlugin {
             type: 'result'
         });
 
-        let sess = this.sessions[sid];
+        let sess: Optional<JingleSessionPC> = this.sessions[sid];
 
         if (action !== 'session-initiate') {
             if (!sess) {
@@ -142,12 +151,12 @@ export default class JingleConnectionPlugin extends ConnectionPlugin {
 
             return true;
         }
-        const now = window.performance.now();
+        const now: number = window.performance.now();
 
         // FIXME that should work most of the time, but we'd have to
         // think how secure it is to assume that user with "focus"
         // nickname is Jicofo.
-        const isP2P = Strophe.getResourceFromJid(fromJid) !== 'focus';
+        const isP2P: boolean = Strophe.getResourceFromJid(fromJid) !== 'focus';
 
         // see http://xmpp.org/extensions/xep-0166.html#concepts-session
 
@@ -268,7 +277,7 @@ export default class JingleConnectionPlugin extends ConnectionPlugin {
      * @param {string} peer remote participant's JID
      * @return {JingleSessionPC}
      */
-    newP2PJingleSession(me, peer) {
+    newP2PJingleSession(me: string, peer: string): JingleSessionPC {
         const sess
             = new JingleSessionPC(
                 RandomUtil.randomHexString(12),
@@ -291,7 +300,7 @@ export default class JingleConnectionPlugin extends ConnectionPlugin {
      * @param reasonCondition
      * @param reasonText
      */
-    terminate(sid, reasonCondition, reasonText) {
+    terminate(sid: string, reasonCondition?: Nullable<string>, reasonText?: Nullable<string>): void {
         if (this.sessions.hasOwnProperty(sid)) {
             if (this.sessions[sid].state !== 'ended') {
                 this.sessions[sid].onTerminated(reasonCondition, reasonText);
@@ -303,7 +312,7 @@ export default class JingleConnectionPlugin extends ConnectionPlugin {
     /**
      *
      */
-    getStunAndTurnCredentials() {
+    getStunAndTurnCredentials(): void {
         // get stun and turn configuration from server via xep-0215
         // uses time-limited credentials as described in
         // http://tools.ietf.org/html/draft-uberti-behave-turn-rest-00
@@ -343,13 +352,13 @@ export default class JingleConnectionPlugin extends ConnectionPlugin {
      * @param res The response iq.
      * @return {boolean} Whether something was processed from the supplied message.
      */
-    onReceiveStunAndTurnCredentials(res) {
-        let iceservers = [];
+    onReceiveStunAndTurnCredentials(res: Element): boolean {
+        let iceservers: RTCIceServer[] = [];
 
         $(res).find('>services>service').each((idx, el) => {
             // eslint-disable-next-line no-param-reassign
             el = $(el);
-            const dict = {};
+            const dict: RTCIceServer = {} as RTCIceServer;
             const type = el.attr('type');
 
             switch (type) {
@@ -434,7 +443,7 @@ export default class JingleConnectionPlugin extends ConnectionPlugin {
             iceservers[j] = temp;
         }
 
-        let filter;
+        let filter: (server: RTCIceServer) => boolean;
 
         if (options.useTurnUdp) {
             filter = s => s.urls.startsWith('turn');
